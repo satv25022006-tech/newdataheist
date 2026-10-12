@@ -1,0 +1,6 @@
+{
+  "name": "Detective Case File — Investigation Bureau",
+  "description": "Interactive detective case file investigation bureau featuring multi-level cases, strict star scoring, progression state machine, and admin portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
