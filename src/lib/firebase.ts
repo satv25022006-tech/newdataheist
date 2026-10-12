@@ -8,6 +8,7 @@ import {
   getDocs,
   collection,
   setDoc,
+  deleteDoc,
   query,
   orderBy,
   limit,
@@ -183,6 +184,25 @@ class FirebaseManager {
       return [];
     }
   }
+
+  /**
+   * Clears all cases, questions, and submissions from Firestore
+   */
+  public async clearFirestoreCollections(): Promise<{ success: boolean; message: string }> {
+    try {
+      const collectionsToPurge = ['cases', 'questions', 'submissions'];
+      for (const colName of collectionsToPurge) {
+        const snapshot = await getDocs(collection(db, colName));
+        for (const d of snapshot.docs) {
+          await deleteDoc(doc(db, colName, d.id));
+        }
+      }
+      return { success: true, message: 'All Cloud Firestore collections cleared completely.' };
+    } catch (err: any) {
+      console.warn('Error clearing Firestore collections:', err);
+      return { success: false, message: err?.message || 'Failed to clear Firestore collections.' };
+    }
+  }
 }
 
 export const firebaseManager = new FirebaseManager();
@@ -197,6 +217,16 @@ export async function saveCaseToFirebase(caseItem: CaseItem) {
     return { success: true };
   } catch (err) {
     console.warn('Error saving case to Firebase:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+export async function deleteCaseFromFirebase(caseId: string) {
+  try {
+    await deleteDoc(doc(db, 'cases', caseId));
+    return { success: true };
+  } catch (err) {
+    console.warn('Error deleting case from Firebase:', err);
     return { success: false, error: String(err) };
   }
 }

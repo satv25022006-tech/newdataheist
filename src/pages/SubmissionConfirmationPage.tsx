@@ -120,11 +120,18 @@ export const SubmissionConfirmationPage: React.FC = () => {
 
                 <div className="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80">
                   <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>TIME SPENT</span>
+                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>TOTAL TIME SPENT</span>
                   </div>
-                  <div className="text-2xl font-black text-slate-100 mt-0.5">{submission.timeElapsedSeconds || 26}s</div>
-                  <div className="text-[10px] text-slate-500 font-mono">Deduction Pace</div>
+                  <div className="text-2xl font-black text-cyan-300 mt-0.5">
+                    {(() => {
+                      const sec = submission.timeElapsedSeconds || 26;
+                      return sec >= 60
+                        ? `${Math.floor(sec / 60)}m ${(sec % 60).toString().padStart(2, '0')}s`
+                        : `${sec}s`;
+                    })()}
+                  </div>
+                  <div className="text-[10px] text-cyan-500/80 font-mono">Investigation Duration</div>
                 </div>
               </div>
 
@@ -244,6 +251,14 @@ export const SubmissionConfirmationPage: React.FC = () => {
           <div className="pt-2 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] font-mono text-slate-400">
             <div>
               Reference Token: <strong className="text-slate-200 font-mono">{submission.submissionRef}</strong>
+            </div>
+            <div>
+              Total Time Spent: <strong className="text-cyan-400 font-mono">
+                {(() => {
+                  const sec = submission.timeElapsedSeconds || 26;
+                  return sec >= 60 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${sec}s`;
+                })()}
+              </strong>
             </div>
             <div>
               Recorded: {new Date(submission.submittedAt).toLocaleTimeString()}

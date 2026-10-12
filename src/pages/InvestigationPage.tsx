@@ -608,8 +608,10 @@ export const InvestigationPage: React.FC = () => {
               </div>
 
               <div className="p-3.5 rounded-xl border border-slate-800 bg-[#080d19]">
-                <div className="text-[10px] font-mono uppercase text-slate-400">TIME ELAPSED</div>
-                <div className="text-lg font-black font-mono text-slate-100 mt-0.5">{timeElapsed}s</div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">TOTAL TIME SPENT</div>
+                <div className="text-lg font-black font-mono text-cyan-300 mt-0.5">
+                  {timeElapsed >= 60 ? `${Math.floor(timeElapsed / 60)}m ${timeElapsed % 60}s` : `${timeElapsed}s`}
+                </div>
               </div>
 
               <div className="p-3.5 rounded-xl border border-slate-800 bg-[#080d19]">
@@ -834,25 +836,9 @@ export const InvestigationPage: React.FC = () => {
             )}
 
             {/* Footer Navigation Buttons matching State Machine */}
-            <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <Link
-                to={`/case/${caseItem.id}/levels`}
-                className="py-2.5 px-5 rounded-xl cyber-secondary-btn text-xs font-semibold uppercase tracking-wider"
-              >
-                Return to Hub
-              </Link>
-
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
               {/* State Machine Action Buttons */}
               <div className="flex items-center gap-3">
-                {caseItem.retriesAllowed && (
-                  <button
-                    onClick={handleRetry}
-                    className="py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-xs font-semibold uppercase tracking-wider cursor-pointer flex items-center gap-1.5"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Retry Stage</span>
-                  </button>
-                )}
 
                 {/* CRITICAL: If 2+ stars earned and not Hard: ONLY SHOW NEXT LEVEL BUTTON */}
                 {resultData && resultData.stars >= 2 && currentLevel !== 'hard' && (

@@ -60,6 +60,14 @@ export const FinalSubmissionPage: React.FC = () => {
   const accuracy = Math.round((totalScoreEarned / 9) * 100) || 88.5;
   const merits = Math.max(150, totalScoreEarned * 50);
 
+  const computedTimeSpent = attempt.levelHistory && attempt.levelHistory.length > 0
+    ? attempt.levelHistory.reduce((sum, item) => sum + (item.timeElapsedSeconds || 0), 0)
+    : 26;
+
+  const formattedTimeSpent = computedTimeSpent >= 60
+    ? `${Math.floor(computedTimeSpent / 60)}m ${(computedTimeSpent % 60).toString().padStart(2, '0')}s`
+    : `${computedTimeSpent}s`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -80,7 +88,7 @@ export const FinalSubmissionPage: React.FC = () => {
         collegeName,
         teamName,
         accuracy,
-        timeElapsedSeconds: 26,
+        timeElapsedSeconds: computedTimeSpent,
         timeSavedSeconds: 109,
         merits,
       }
@@ -119,8 +127,8 @@ export const FinalSubmissionPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 4 Metrics Strip matching Page 7 */}
-        <div className="grid grid-cols-4 gap-2 text-center p-3 rounded-xl border border-slate-800 bg-[#070e1c] font-mono">
+        {/* 5 Metrics Strip with TOTAL TIME SPENT */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center p-3 rounded-xl border border-slate-800 bg-[#070e1c] font-mono">
           <div>
             <div className="text-[10px] text-slate-400">SCORE</div>
             <div className="text-base font-black text-slate-100">{merits}</div>
@@ -132,6 +140,10 @@ export const FinalSubmissionPage: React.FC = () => {
           <div>
             <div className="text-[10px] text-slate-400">ACCURACY</div>
             <div className="text-base font-black text-cyan-400">{accuracy}%</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400">TOTAL TIME SPENT</div>
+            <div className="text-base font-black text-cyan-300">{formattedTimeSpent}</div>
           </div>
           <div>
             <div className="text-[10px] text-slate-400">TIME SAVED</div>

@@ -553,9 +553,10 @@ export const AdminPage: React.FC = () => {
 
                   <button
                     onClick={() => handleDeleteCase(c.id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-400"
+                    className="p-1.5 rounded-lg border border-rose-800/80 bg-rose-950/40 hover:bg-rose-900/80 text-rose-300 text-xs font-mono flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Delete Case</span>
                   </button>
                 </div>
               </div>
@@ -758,6 +759,7 @@ export const AdminPage: React.FC = () => {
                     <th className="p-3">College</th>
                     <th className="p-3 text-center">Score</th>
                     <th className="p-3 text-center">Stars</th>
+                    <th className="p-3 text-center">Total Time Spent</th>
                     <th className="p-3 text-right">Date</th>
                     <th className="p-3 text-center">Inspect</th>
                   </tr>
@@ -773,6 +775,11 @@ export const AdminPage: React.FC = () => {
                       <td className="p-3 text-slate-300">{sub.collegeName || 'National Tech'}</td>
                       <td className="p-3 text-center font-bold text-slate-200">{sub.totalScoreEarned} / {sub.totalAttemptedPossible}</td>
                       <td className="p-3 text-center font-bold text-amber-400">{sub.totalStarsEarned}★</td>
+                      <td className="p-3 text-center font-bold text-cyan-300">
+                        {sub.timeElapsedSeconds >= 60
+                          ? `${Math.floor(sub.timeElapsedSeconds / 60)}m ${sub.timeElapsedSeconds % 60}s`
+                          : `${sub.timeElapsedSeconds || 26}s`}
+                      </td>
                       <td className="p-3 text-right text-slate-400 text-[10px]">{new Date(sub.submittedAt).toLocaleDateString()}</td>
                       <td className="p-3 text-center">
                         <button
@@ -1092,17 +1099,23 @@ export const AdminPage: React.FC = () => {
             <p className="text-slate-400">
               Current tournament engine operating in dark cyber crime bureau tournament configuration.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap gap-3">
               <button
-                onClick={() => {
-                  if (confirm('Reset to initial factory cyber cases & posters?')) {
-                    bureauStore.resetToInitial();
+                onClick={async () => {
+                  if (confirm('Are you sure you want to fully clear and delete all sample data from local storage and Firebase Cloud Firestore?')) {
+                    bureauStore.clearAllSampleData();
                     refreshData();
+                    setFirebaseStatusMsg({ type: 'info', text: 'Purging sample documents from Firebase Cloud Firestore...' });
+                    const res = await firebaseManager.clearFirestoreCollections();
+                    setFirebaseStatusMsg({
+                      type: res.success ? 'success' : 'error',
+                      text: res.message,
+                    });
                   }
                 }}
-                className="py-2.5 px-5 rounded-xl border border-rose-800 bg-rose-950/40 text-rose-300 hover:bg-rose-900 font-bold cursor-pointer"
+                className="py-2.5 px-5 rounded-xl border border-rose-600 bg-rose-950/80 hover:bg-rose-900 text-rose-200 font-bold cursor-pointer transition-colors shadow-lg"
               >
-                Reset to Factory Seed Data
+                Clear All Sample Data Fully (Local & Cloud Firestore)
               </button>
             </div>
           </div>
@@ -1274,20 +1287,37 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsCaseModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-400"
+                  onClick={() => {
+                    if (confirm('Confirm deletion of this case file and all associated questions?')) {
+                      handleDeleteCase(editingCase.id);
+                      setIsCaseModalOpen(false);
+                      setEditingCase(null);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl border border-rose-800/80 bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  Cancel
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Delete Case</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl cyber-glow-btn font-bold uppercase tracking-wider"
-                >
-                  Save Case Parameters
-                </button>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCaseModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl cyber-glow-btn font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Save Case Parameters
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1488,6 +1518,15 @@ export const AdminPage: React.FC = () => {
               <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between font-bold">
                 <span className="text-slate-300">Total Score: {inspectingSub.totalScoreEarned} / {inspectingSub.totalAttemptedPossible} pts</span>
                 <span className="text-amber-400">{inspectingSub.totalStarsEarned}/9 Stars</span>
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between font-bold text-cyan-300">
+                <span className="text-slate-300">Total Time Spent:</span>
+                <span>
+                  {inspectingSub.timeElapsedSeconds >= 60
+                    ? `${Math.floor(inspectingSub.timeElapsedSeconds / 60)}m ${inspectingSub.timeElapsedSeconds % 60}s`
+                    : `${inspectingSub.timeElapsedSeconds || 26}s`}
+                </span>
               </div>
 
               <div className="pt-2 text-right">

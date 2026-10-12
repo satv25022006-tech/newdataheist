@@ -9,7 +9,8 @@ import {
   Fingerprint, 
   Clock, 
   AlertCircle,
-  ChevronLeft
+  ChevronLeft,
+  Trash2
 } from 'lucide-react';
 
 export const CaseDetailsPage: React.FC = () => {
@@ -70,10 +71,24 @@ export const CaseDetailsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (confirm(`Confirm permanent deletion of case file "${caseItem.title}"?`)) {
+                  bureauStore.deleteCase(caseItem.id);
+                  navigate('/');
+                }
+              }}
+              className="py-3 px-4 rounded-xl border border-rose-800/80 bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              title="Delete Case File"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span className="hidden sm:inline">Delete Case</span>
+            </button>
+
             <button
               onClick={() => navigate(`/case/${caseItem.id}/rules`)}
-              className="w-full sm:w-auto py-3 px-6 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+              className="py-3 px-6 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg"
             >
               <span>Start Case File</span>
               <ArrowRight className="w-4 h-4" />

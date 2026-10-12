@@ -95,19 +95,11 @@ export class BureauStore {
 
   private init() {
     this.cases = loadFromStorage<CaseItem[]>(STORAGE_KEYS.CASES, INITIAL_CASES);
-    if (!this.cases.some(c => c.id === 'case-mk-cyber')) {
-      this.cases = INITIAL_CASES;
-      saveToStorage(STORAGE_KEYS.CASES, this.cases);
-    }
     this.questions = loadFromStorage<Question[]>(STORAGE_KEYS.QUESTIONS, INITIAL_QUESTIONS);
-    if (!this.questions.some(q => q.caseId === 'case-mk-cyber' && q.posterUrl)) {
-      this.questions = INITIAL_QUESTIONS;
-      saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
-    }
     this.evidence = loadFromStorage<CaseEvidence[]>(STORAGE_KEYS.EVIDENCE, INITIAL_EVIDENCE);
     this.suspects = loadFromStorage<Suspect[]>(STORAGE_KEYS.SUSPECTS, INITIAL_SUSPECTS);
     this.attempts = loadFromStorage<Record<string, GameAttempt>>(STORAGE_KEYS.ATTEMPTS, {});
-    this.submissions = loadFromStorage<FinalSubmission[]>(STORAGE_KEYS.SUBMISSIONS, this.generateSeedSubmissions());
+    this.submissions = loadFromStorage<FinalSubmission[]>(STORAGE_KEYS.SUBMISSIONS, []);
     this.currentUser = loadFromStorage<UserProfile>(STORAGE_KEYS.CURRENT_USER, DEFAULT_INVESTIGATOR);
     this.branding = loadFromStorage<BureauBranding>(STORAGE_KEYS.BRANDING, DEFAULT_BRANDING);
   }
@@ -134,72 +126,7 @@ export class BureauStore {
   }
 
   private generateSeedSubmissions(): FinalSubmission[] {
-    return [
-      {
-        id: 'sub-seed-1',
-        submissionRef: 'SUB-MK-4109',
-        caseId: 'case-mk-cyber',
-        caseCode: 'mk',
-        caseTitle: 'Operation MK: Cyber Crime Syndicate',
-        userId: 'usr-inv-002',
-        playerName: 'Agent S. Mercer',
-        badgeNumber: 'BD-7714',
-        registerNumber: '21CS041',
-        collegeName: 'National Institute of Technology',
-        teamName: 'CyberKnights',
-        submissionType: 'final',
-        isCompleted: true,
-        easyScore: 3,
-        easyStars: 3,
-        mediumScore: 3,
-        mediumStars: 3,
-        hardScore: 2,
-        hardStars: 2,
-        totalScoreEarned: 8,
-        totalAttemptedPossible: 9,
-        fullCaseMaxScore: 9,
-        totalStarsEarned: 8,
-        completionPercentage: 100,
-        accuracy: 88.5,
-        timeElapsedSeconds: 26,
-        timeSavedSeconds: 109,
-        merits: 450,
-        feedbackRating: 5,
-        feedbackComments: 'Superb forensic progression. The RFID sniffer and memory dump exhibits required deep deduction!',
-        submittedAt: '2026-10-10T14:22:00Z',
-        reviewedByAdmin: true,
-      },
-      {
-        id: 'sub-seed-2',
-        submissionRef: 'SUB-MK-1092',
-        caseId: 'case-mk-cyber',
-        caseCode: 'mk',
-        caseTitle: 'Operation MK: Cyber Crime Syndicate',
-        userId: 'usr-inv-003',
-        playerName: 'Cadet T. Higgins',
-        badgeNumber: 'BD-3391',
-        registerNumber: '21IT089',
-        collegeName: 'Apex College of Technology',
-        teamName: 'BinarySolvers',
-        submissionType: 'early',
-        isCompleted: false,
-        easyScore: 1,
-        easyStars: 1,
-        totalScoreEarned: 1,
-        totalAttemptedPossible: 3,
-        fullCaseMaxScore: 9,
-        totalStarsEarned: 1,
-        completionPercentage: 33,
-        accuracy: 33.3,
-        timeElapsedSeconds: 45,
-        timeSavedSeconds: 75,
-        merits: 150,
-        feedbackRating: 4,
-        feedbackComments: 'Submitted early for peer analysis.',
-        submittedAt: '2026-10-11T09:15:00Z',
-        reviewedByAdmin: false,
-      }
-    ];
+    return [];
   }
 
   // --- Auth & User ---
@@ -237,8 +164,14 @@ export class BureauStore {
   }
 
   deleteCase(id: string): boolean {
-    this.cases = this.cases.filter(c => c.id !== id);
+    this.cases = this.cases.filter(c => c.id !== id && c.caseCode !== id);
+    this.questions = this.questions.filter(q => q.caseId !== id);
+    this.evidence = this.evidence.filter(e => e.caseId !== id);
+    this.suspects = this.suspects.filter(s => s.caseId !== id);
     saveToStorage(STORAGE_KEYS.CASES, this.cases);
+    saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
+    saveToStorage(STORAGE_KEYS.EVIDENCE, this.evidence);
+    saveToStorage(STORAGE_KEYS.SUSPECTS, this.suspects);
     return true;
   }
 
@@ -690,8 +623,8 @@ export class BureauStore {
   getAdminAnalytics(): AdminAnalytics {
     const totalCases = this.cases.length;
     const publishedCases = this.cases.filter(c => c.status === 'published').length;
-    const registeredPlayers = 14; // Default baseline + local
-    const totalAttempts = Object.keys(this.attempts).length + 18;
+    const registeredPlayers = new Set(this.submissions.map(s => s.userId)).size;
+    const totalAttempts = Object.keys(this.attempts).length;
     const completedInvestigations = this.submissions.filter(s => s.isCompleted).length;
     const earlySubmissions = this.submissions.filter(s => s.submissionType === 'early').length;
 
@@ -708,11 +641,7 @@ export class BureauStore {
     ];
 
     const submissionsByDay = [
-      { date: 'Oct 08', count: 3 },
-      { date: 'Oct 09', count: 5 },
-      { date: 'Oct 10', count: 7 },
-      { date: 'Oct 11', count: 4 },
-      { date: 'Oct 12', count: this.submissions.length },
+      { date: 'Active Records', count: this.submissions.length },
     ];
 
     return {
@@ -742,6 +671,22 @@ export class BureauStore {
     saveToStorage(STORAGE_KEYS.SUSPECTS, this.suspects);
     saveToStorage(STORAGE_KEYS.ATTEMPTS, this.attempts);
     saveToStorage(STORAGE_KEYS.SUBMISSIONS, this.submissions);
+  }
+
+  // Clear and delete all sample data fully
+  clearAllSampleData() {
+    this.cases = [];
+    this.questions = [];
+    this.evidence = [];
+    this.suspects = [];
+    this.attempts = {};
+    this.submissions = [];
+    saveToStorage(STORAGE_KEYS.CASES, []);
+    saveToStorage(STORAGE_KEYS.QUESTIONS, []);
+    saveToStorage(STORAGE_KEYS.EVIDENCE, []);
+    saveToStorage(STORAGE_KEYS.SUSPECTS, []);
+    saveToStorage(STORAGE_KEYS.ATTEMPTS, {});
+    saveToStorage(STORAGE_KEYS.SUBMISSIONS, []);
   }
 }
 

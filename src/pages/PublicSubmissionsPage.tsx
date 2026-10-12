@@ -109,6 +109,7 @@ export const PublicSubmissionsPage: React.FC = () => {
                 <th className="py-3 px-4">Institution</th>
                 <th className="py-3 px-4 text-center">Score</th>
                 <th className="py-3 px-4 text-center">Stars</th>
+                <th className="py-3 px-4 text-center">Total Time Spent</th>
                 <th className="py-3 px-4 text-right">Filed Date</th>
                 <th className="py-3 px-4 text-center">Inspect</th>
               </tr>
@@ -116,7 +117,7 @@ export const PublicSubmissionsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-800/80">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
                     No matching investigation records found.
                   </td>
                 </tr>
@@ -131,6 +132,11 @@ export const PublicSubmissionsPage: React.FC = () => {
                     <td className="py-3 px-4 text-slate-300">{sub.collegeName || 'National Tech'}</td>
                     <td className="py-3 px-4 text-center font-bold text-slate-100">{sub.totalScoreEarned} / {sub.totalAttemptedPossible}</td>
                     <td className="py-3 px-4 text-center font-bold text-amber-400">{sub.totalStarsEarned}★</td>
+                    <td className="py-3 px-4 text-center font-bold text-cyan-300 font-mono">
+                      {sub.timeElapsedSeconds >= 60
+                        ? `${Math.floor(sub.timeElapsedSeconds / 60)}m ${sub.timeElapsedSeconds % 60}s`
+                        : `${sub.timeElapsedSeconds || 26}s`}
+                    </td>
                     <td className="py-3 px-4 text-right text-slate-400 text-[10px]">{new Date(sub.submittedAt).toLocaleDateString()}</td>
                     <td className="py-3 px-4 text-center">
                       <button
@@ -186,6 +192,15 @@ export const PublicSubmissionsPage: React.FC = () => {
               <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between font-bold">
                 <span className="text-slate-300">Total Score: {selectedSub.totalScoreEarned} / {selectedSub.totalAttemptedPossible} pts</span>
                 <span className="text-amber-400">{selectedSub.totalStarsEarned}/9 Stars</span>
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between font-bold text-cyan-300">
+                <span className="text-slate-300">Total Time Spent:</span>
+                <span>
+                  {selectedSub.timeElapsedSeconds >= 60
+                    ? `${Math.floor(selectedSub.timeElapsedSeconds / 60)}m ${selectedSub.timeElapsedSeconds % 60}s`
+                    : `${selectedSub.timeElapsedSeconds || 26}s`}
+                </span>
               </div>
 
               {selectedSub.feedbackComments && (

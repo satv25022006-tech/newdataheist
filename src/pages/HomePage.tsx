@@ -60,62 +60,78 @@ export const HomePage: React.FC = () => {
       </div>
 
       {/* Case File Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-        {cases.map((c) => (
-          <div
-            key={c.id}
-            className="rounded-2xl border border-sky-900/60 bg-[#0c1322] p-6 space-y-6 shadow-xl hover:border-cyan-500/50 hover:shadow-[0_0_25px_rgba(6,182,212,0.2)] transition-all flex flex-col justify-between"
-          >
-            {/* Top Badges */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                <span className="text-[11px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-semibold">
-                  {c.badgeTag || 'CYBER FORENSICS'}
-                </span>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold">
-                  {c.subTag || 'Active Tournament'}
-                </span>
-              </div>
+      {cases.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          {cases.map((c) => (
+            <div
+              key={c.id}
+              className="rounded-2xl border border-sky-900/60 bg-[#0c1322] p-6 space-y-6 shadow-xl hover:border-cyan-500/50 hover:shadow-[0_0_25px_rgba(6,182,212,0.2)] transition-all flex flex-col justify-between"
+            >
+              {/* Top Badges */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <span className="text-[11px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-semibold">
+                    {c.badgeTag || 'CYBER FORENSICS'}
+                  </span>
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold">
+                    {c.subTag || 'Active Tournament'}
+                  </span>
+                </div>
 
-              {/* Fingerprint Emblem */}
-              <div className="w-12 h-12 rounded-xl bg-sky-950/70 border border-sky-600/40 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
-                <Fingerprint className="w-6 h-6" />
-              </div>
+                {/* Fingerprint Emblem */}
+                <div className="w-12 h-12 rounded-xl bg-sky-950/70 border border-sky-600/40 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
+                  <Fingerprint className="w-6 h-6" />
+                </div>
 
-              {/* Title & Acronym matching Page 1 */}
-              <div>
-                <h2 className="text-xl font-black text-slate-100 font-mono tracking-wide">
-                  {c.caseCode}
-                </h2>
-                <div className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-semibold">
-                  {c.acronym || c.title}
+                {/* Title & Acronym matching Page 1 */}
+                <div>
+                  <h2 className="text-xl font-black text-slate-100 font-mono tracking-wide">
+                    {c.caseCode}
+                  </h2>
+                  <div className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-semibold">
+                    {c.acronym || c.title}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {c.summary}
+                </p>
+
+                {/* Footer specs */}
+                <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-2 border-t border-slate-800/60">
+                  <span>Stages: <strong>3 Levels</strong></span>
+                  <span>Est: <strong>{c.estimatedMinutes || 15} Mins</strong></span>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {c.summary}
-              </p>
-
-              {/* Footer specs */}
-              <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-2 border-t border-slate-800/60">
-                <span>Stages: <strong>3 Levels</strong></span>
-                <span>Est: <strong>{c.estimatedMinutes || 15} Mins</strong></span>
+              {/* Select Case Button (Page 1) */}
+              <div className="pt-2">
+                <button
+                  onClick={() => navigate(`/case/${c.id}/rules`)}
+                  className="w-full py-3 px-4 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <span>SELECT CASE & VIEW RULES</span>
+                  <ChevronRight className="w-4 h-4 stroke-[3]" />
+                </button>
               </div>
             </div>
-
-            {/* Select Case Button (Page 1) */}
-            <div className="pt-2">
-              <button
-                onClick={() => navigate(`/case/${c.id}/rules`)}
-                className="w-full py-3 px-4 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <span>SELECT CASE & VIEW RULES</span>
-                <ChevronRight className="w-4 h-4 stroke-[3]" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-sky-900/60 bg-[#0c1322] p-8 text-center space-y-4 max-w-xl mx-auto font-mono shadow-2xl">
+          <FolderLock className="w-10 h-10 text-cyan-400 mx-auto" />
+          <h2 className="text-lg font-bold text-slate-100">No Active Case Files</h2>
+          <p className="text-xs text-slate-400 font-sans leading-relaxed">
+            All sample data has been cleared. Go to Admin Portal to configure or import new case files.
+          </p>
+          <button
+            onClick={() => navigate('/admin')}
+            className="py-2.5 px-5 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider cursor-pointer"
+          >
+            Go to Admin Portal
+          </button>
+        </div>
+      )}
     </div>
   );
 };
