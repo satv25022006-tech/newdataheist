@@ -42,6 +42,13 @@ export const INITIAL_CASES: CaseItem[] = [
         description: 'Disarm laser arrays and intercept the getaway craft before extraction.'
       }
     ],
+    rulesAndRegulations: [
+      '1. All investigators must register using official participant credentials before opening case files.',
+      '2. Time limits are strictly enforced (90 seconds per level). Unsubmitted answers when time expires will default to last selected choice.',
+      '3. Each level consists of 3 forensic exhibit questions (Easy, Medium, Hard). Progression requires earning a minimum of 2 stars on preceding levels.',
+      '4. Use of external AI solvers or compromised network tools during live symposium rounds will result in instant disqualification.',
+      '5. Early submission allows locked-in scoring based on completed levels with merit bonus multipliers.'
+    ],
     createdAt: '2026-10-01T10:00:00Z',
     updatedAt: '2026-10-12T07:30:00Z',
   },

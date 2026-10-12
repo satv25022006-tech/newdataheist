@@ -11,7 +11,12 @@ import {
   UserProfile
 } from '../types';
 import { INITIAL_CASES, INITIAL_EVIDENCE, INITIAL_SUSPECTS, INITIAL_QUESTIONS } from './initialData';
-import { supabase, isSupabaseConfigured, supabaseManager } from './supabase';
+import { 
+  saveSubmissionToFirebase, 
+  saveCaseToFirebase, 
+  saveQuestionToFirebase, 
+  saveBrandingToFirebase 
+} from './firebase';
 
 const STORAGE_KEYS = {
   CASES: 'bureau_cases_v1',
@@ -118,6 +123,9 @@ export class BureauStore {
       ...newBranding,
     };
     saveToStorage(STORAGE_KEYS.BRANDING, this.branding);
+    saveBrandingToFirebase(this.branding.bureauName, this.branding.logoUrl).catch(err => {
+      console.warn('Firebase branding update notice:', err);
+    });
     // Dispatch custom event so reactive components update instantly
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('bureau-branding-updated'));
@@ -222,6 +230,9 @@ export class BureauStore {
       this.cases.push({ ...caseItem, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }
     saveToStorage(STORAGE_KEYS.CASES, this.cases);
+    saveCaseToFirebase(caseItem).catch(err => {
+      console.warn('Firebase case persistence notice:', err);
+    });
     return caseItem;
   }
 
@@ -280,6 +291,9 @@ export class BureauStore {
       this.questions.push(question);
     }
     saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
+    saveQuestionToFirebase(question).catch(err => {
+      console.warn('Firebase question persistence notice:', err);
+    });
     return question;
   }
 
@@ -638,9 +652,9 @@ export class BureauStore {
     this.submissions.unshift(submissionRecord);
     saveToStorage(STORAGE_KEYS.SUBMISSIONS, this.submissions);
 
-    // Auto-persist directly into Supabase database
-    supabaseManager.insertSubmission(submissionRecord).catch(err => {
-      console.warn('Background Supabase persistence error:', err);
+    // Auto-persist directly into Firebase Firestore database
+    saveSubmissionToFirebase(submissionRecord).catch(err => {
+      console.warn('Background Firebase persistence notice:', err);
     });
 
     attempt.status = submissionType === 'early' ? 'submitted_early' : 'submitted_final';

@@ -35,28 +35,34 @@ export const RulesPage: React.FC = () => {
     }
   };
 
-  const rulesList = [
-    {
-      number: 'Rule 1',
-      title: 'Time limit for Rules & Regulations is 120s',
-      detail: 'Investigators must review protocol directives before proceeding to operational briefing.',
-    },
-    {
-      number: 'Rule 2',
-      title: 'Easy stage is open immediately; earn 2 stars to unlock Medium',
-      detail: 'Higher clearance stages remain locked until satisfactory investigative accuracy is proven.',
-    },
-    {
-      number: 'Rule 3',
-      title: 'Each question has a strict countdown timer and auto-closes on timeout',
-      detail: 'Responses must be confirmed before the clock reaches zero or deduction defaults.',
-    },
-    {
-      number: 'Rule 4',
-      title: 'Upon completing all levels, submit college team credentials for the official symposium record',
-      detail: 'Candidate name, roll number, college name, and team designation are required for persistence.',
-    },
-  ];
+  const rulesList = (caseItem?.rulesAndRegulations && caseItem.rulesAndRegulations.length > 0)
+    ? caseItem.rulesAndRegulations.map((ruleText, idx) => ({
+        number: `Rule ${idx + 1}`,
+        title: ruleText,
+        detail: 'Official bureau case protocol directive.',
+      }))
+    : [
+        {
+          number: 'Rule 1',
+          title: 'Time limit for Rules & Regulations is 120s',
+          detail: 'Investigators must review protocol directives before proceeding to operational briefing.',
+        },
+        {
+          number: 'Rule 2',
+          title: 'Easy stage is open immediately; earn 2 stars to unlock Medium',
+          detail: 'Higher clearance stages remain locked until satisfactory investigative accuracy is proven.',
+        },
+        {
+          number: 'Rule 3',
+          title: 'Each question has a strict countdown timer and auto-closes on timeout',
+          detail: 'Responses must be confirmed before the clock reaches zero or deduction defaults.',
+        },
+        {
+          number: 'Rule 4',
+          title: 'Upon completing all levels, submit college team credentials for official record',
+          detail: 'Candidate name, roll number, college name, and team designation are required for persistence.',
+        },
+      ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2">

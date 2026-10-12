@@ -46,24 +46,28 @@ import {
   RefreshCw,
   Copy,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
-import { supabaseManager, SupabaseConfig } from '../lib/supabase';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { 
+  saveCaseToFirebase, 
+  saveQuestionToFirebase, 
+  saveSubmissionToFirebase, 
+  testFirestoreConnection,
+  firebaseManager 
+} from '../lib/firebase';
 
 export const AdminPage: React.FC = () => {
   const { user, isAdmin, login, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'cases' | 'questions' | 'submissions' | 'supabase' | 'feedback' | 'settings'
+    'dashboard' | 'cases' | 'questions' | 'submissions' | 'firebase' | 'feedback' | 'settings'
   >('dashboard');
 
-  // Supabase Integration state
-  const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseManager.getConfig());
-  const [supabaseStatusMsg, setSupabaseStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
-  const [isSyncingSupabase, setIsSyncingSupabase] = useState(false);
-  const [isSqlCopied, setIsSqlCopied] = useState(false);
-  const [showSqlSchema, setShowSqlSchema] = useState(false);
+  // Firebase Integration state
+  const [firebaseStatusMsg, setFirebaseStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
 
   const [analytics, setAnalytics] = useState(bureauStore.getAdminAnalytics());
   const [cases, setCases] = useState<CaseItem[]>(bureauStore.getCases(true));
@@ -279,89 +283,47 @@ export const AdminPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleSaveSupabaseConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanConfig = {
-      ...supabaseConfig,
-      url: supabaseConfig.url.trim().replace(/\/+$/, ''),
-      anonKey: supabaseConfig.anonKey.trim(),
-      serviceKey: supabaseConfig.serviceKey ? supabaseConfig.serviceKey.trim() : '',
-    };
-    const updated = supabaseManager.saveConfig(cleanConfig);
-    setSupabaseConfig(updated);
-    setSupabaseStatusMsg({
-      type: 'success',
-      text: 'Supabase configuration saved & sanitized successfully to bureau settings.',
-    });
-    setTimeout(() => setSupabaseStatusMsg(null), 4000);
-  };
-
-  const handleTestSupabaseConnection = async () => {
-    setIsTestingSupabase(true);
-    setSupabaseStatusMsg({ type: 'info', text: 'Pinging Supabase endpoint and validating credentials...' });
+  const handleTestFirebaseConnection = async () => {
+    setFirebaseStatusMsg({ type: 'info', text: 'Testing connection to Firebase Firestore...' });
     try {
-      // Ensure current input values are saved and cleaned first
-      supabaseManager.saveConfig({
-        ...supabaseConfig,
-        url: supabaseConfig.url.trim().replace(/\/+$/, ''),
-        anonKey: supabaseConfig.anonKey.trim(),
+      await testFirestoreConnection();
+      setFirebaseStatusMsg({
+        type: 'success',
+        text: `Successfully connected to Firebase Project [${firebaseConfig.projectId}] and Firestore Database [${firebaseConfig.firestoreDatabaseId}]!`,
       });
-      const res = await supabaseManager.testConnection();
-      if (res.success) {
-        setSupabaseConfig(supabaseManager.getConfig());
-        setSupabaseStatusMsg({
-          type: 'success',
-          text: res.message,
-        });
-      } else {
-        setSupabaseStatusMsg({
-          type: 'error',
-          text: res.message,
-        });
-      }
     } catch (err: any) {
-      setSupabaseStatusMsg({
+      setFirebaseStatusMsg({
         type: 'error',
-        text: err?.message || 'Failed to connect to Supabase.',
+        text: err?.message || 'Failed to ping Firebase Cloud Firestore.',
       });
-    } finally {
-      setIsTestingSupabase(false);
     }
   };
 
-  const handleSyncToSupabase = async () => {
-    setIsSyncingSupabase(true);
-    setSupabaseStatusMsg({ type: 'info', text: 'Syncing cases, exhibits, posters, and submissions to Supabase...' });
+  const handleSyncToFirebase = async () => {
+    setIsSyncingFirebase(true);
+    setFirebaseStatusMsg({ type: 'info', text: 'Syncing cases, forensic exhibits, posters, and submissions to Firebase Cloud Firestore...' });
     try {
       const allQs = bureauStore.getAllQuestions();
-      const res = await supabaseManager.syncDataToSupabase(cases, allQs, submissions);
+      const res = await firebaseManager.syncDataToFirebase(cases, allQs, submissions);
       if (res.success) {
-        setSupabaseConfig(supabaseManager.getConfig());
-        setSupabaseStatusMsg({
+        setFirebaseStatusMsg({
           type: 'success',
           text: res.message,
         });
       } else {
-        setSupabaseStatusMsg({
+        setFirebaseStatusMsg({
           type: 'error',
           text: res.message,
         });
       }
     } catch (err: any) {
-      setSupabaseStatusMsg({
+      setFirebaseStatusMsg({
         type: 'error',
-        text: err?.message || 'Sync failed.',
+        text: err?.message || 'Firebase sync failed.',
       });
     } finally {
-      setIsSyncingSupabase(false);
+      setIsSyncingFirebase(false);
     }
-  };
-
-  const handleCopySqlSchema = () => {
-    const sql = supabaseManager.generateSQLSchema();
-    navigator.clipboard.writeText(sql);
-    setIsSqlCopied(true);
-    setTimeout(() => setIsSqlCopied(false), 3000);
   };
 
   return (
@@ -400,7 +362,7 @@ export const AdminPage: React.FC = () => {
           { id: 'cases', label: 'Case Management', icon: FolderKanban },
           { id: 'questions', label: 'Questions & Poster Uploads', icon: HelpCircle },
           { id: 'submissions', label: 'Submissions Audit', icon: FileCheck2 },
-          { id: 'supabase', label: 'Supabase Integration', icon: Database },
+          { id: 'firebase', label: 'Firebase Integration', icon: Database },
           { id: 'feedback', label: 'Player Feedback', icon: MessageSquare },
           { id: 'settings', label: 'Bureau Settings', icon: Settings },
         ].map((tab) => {
@@ -575,6 +537,12 @@ export const AdminPage: React.FC = () => {
                     >
                       <Edit3 className="w-3.5 h-3.5 text-cyan-400" /> Edit Case
                     </button>
+                    <Link
+                      to={`/case/${c.id}/rules`}
+                      className="p-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:border-amber-500 text-amber-300 text-xs font-mono flex items-center gap-1"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-400" /> Rules
+                    </Link>
                     <Link
                       to={`/case/${c.id}`}
                       className="p-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:border-cyan-500 text-slate-300 text-xs font-mono flex items-center gap-1"
@@ -823,8 +791,8 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB: SUPABASE CLOUD INTEGRATION */}
-      {activeTab === 'supabase' && (
+      {/* TAB: FIREBASE CLOUD INTEGRATION */}
+      {activeTab === 'firebase' && (
         <div className="space-y-6">
           {/* Header & Connection Status Banner */}
           <div className="rounded-2xl border border-sky-900/60 bg-[#0c1322] p-6 space-y-4 shadow-xl">
@@ -833,156 +801,98 @@ export const AdminPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Database className="w-5 h-5 text-cyan-400" />
                   <h2 className="text-base sm:text-lg font-bold font-mono text-slate-100 uppercase tracking-wide">
-                    Supabase Cloud Database & Storage Integration
+                    Firebase Cloud Firestore Integration
                   </h2>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Manage external PostgreSQL persistence, live tournament sync, and cloud bucket hosting for forensic posters.
+                  Live cloud persistence for case files, forensic exhibits, question posters, and player tournament submissions.
                 </p>
               </div>
 
               {/* Status Badge */}
-              <div>
-                {supabaseConfig.isConnected ? (
-                  <div className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-emerald-950/80 border border-emerald-500 text-emerald-300 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>SUPABASE CLOUD LIVE</span>
-                  </div>
-                ) : (
-                  <div className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-sky-950/80 border border-sky-700 text-cyan-300 flex items-center gap-2">
-                    <Server className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>LOCAL PERSISTENCE MODE</span>
-                  </div>
-                )}
+              <div className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-emerald-950/80 border border-emerald-500 text-emerald-300 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>FIRESTORE CLOUD CONNECTED</span>
               </div>
             </div>
 
             {/* Status Alert Banner */}
-            {supabaseStatusMsg && (
+            {firebaseStatusMsg && (
               <div
                 className={`p-3.5 rounded-xl border text-xs font-mono flex items-center gap-2.5 animate-in fade-in duration-150 ${
-                  supabaseStatusMsg.type === 'success'
+                  firebaseStatusMsg.type === 'success'
                     ? 'border-emerald-600 bg-emerald-950/60 text-emerald-200'
-                    : supabaseStatusMsg.type === 'error'
+                    : firebaseStatusMsg.type === 'error'
                     ? 'border-rose-600 bg-rose-950/60 text-rose-200'
                     : 'border-cyan-600 bg-cyan-950/60 text-cyan-200'
                 }`}
               >
-                {supabaseStatusMsg.type === 'success' ? (
+                {firebaseStatusMsg.type === 'success' ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                ) : supabaseStatusMsg.type === 'error' ? (
+                ) : firebaseStatusMsg.type === 'error' ? (
                   <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
                 ) : (
                   <RefreshCw className="w-4 h-4 text-cyan-400 shrink-0 animate-spin" />
                 )}
-                <span>{supabaseStatusMsg.text}</span>
+                <span>{firebaseStatusMsg.text}</span>
               </div>
             )}
 
             {/* Grid of Settings & Pipeline */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
-              {/* Credentials Configuration Form */}
+              {/* Firebase Environment Info */}
               <div className="lg:col-span-7 space-y-4">
-                <div className="border border-slate-800 bg-[#070e1c] p-5 rounded-xl space-y-4">
+                <div className="border border-slate-800 bg-[#070e1c] p-5 rounded-xl space-y-4 font-mono text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Server className="w-3.5 h-3.5" />
-                      Connection Credentials
+                      Provisioned Firebase Parameters
                     </span>
-                    <span className="text-[10px] font-mono text-slate-500">PostgreSQL / REST v1</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Active SDK</span>
                   </div>
 
-                  <form onSubmit={handleSaveSupabaseConfig} className="space-y-3.5 font-mono text-xs">
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">
-                        Supabase Project URL
-                      </label>
+                      <label className="block text-slate-400 text-[11px] mb-1">Firebase Project ID</label>
                       <input
-                        type="url"
-                        required
-                        value={supabaseConfig.url}
-                        onChange={(e) => setSupabaseConfig({ ...supabaseConfig, url: e.target.value })}
-                        placeholder="https://xyzcompany.supabase.co"
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 text-xs font-mono"
+                        type="text"
+                        readOnly
+                        value={firebaseConfig.projectId}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-cyan-300 font-mono text-xs"
                       />
-                      <span className="text-[10px] text-slate-500 mt-1 block">
-                        Found under Project Settings &gt; API &gt; Project URL
-                      </span>
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">
-                        Anon Public API Key
-                      </label>
+                      <label className="block text-slate-400 text-[11px] mb-1">Firestore Database ID</label>
                       <input
-                        type="password"
-                        required
-                        value={supabaseConfig.anonKey}
-                        onChange={(e) => setSupabaseConfig({ ...supabaseConfig, anonKey: e.target.value })}
-                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 text-xs font-mono"
+                        type="text"
+                        readOnly
+                        value={firebaseConfig.firestoreDatabaseId}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-cyan-300 font-mono text-xs"
                       />
-                      <span className="text-[10px] text-slate-500 mt-1 block">
-                        Found under Project Settings &gt; API &gt; Project API Keys &gt; anon public
-                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1">
-                          Service Role Key (Optional)
-                        </label>
-                        <input
-                          type="password"
-                          value={supabaseConfig.serviceKey || ''}
-                          onChange={(e) => setSupabaseConfig({ ...supabaseConfig, serviceKey: e.target.value })}
-                          placeholder="Optional admin key"
-                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 text-xs font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1">
-                          Poster Storage Bucket
-                        </label>
-                        <input
-                          type="text"
-                          value={supabaseConfig.storageBucket}
-                          onChange={(e) => setSupabaseConfig({ ...supabaseConfig, storageBucket: e.target.value })}
-                          placeholder="exhibit-posters"
-                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 text-xs font-mono"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">Auth Domain</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={firebaseConfig.authDomain}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-slate-300 font-mono text-xs"
+                      />
                     </div>
+                  </div>
 
-                    <div className="pt-2 flex flex-wrap items-center gap-3">
-                      <button
-                        type="submit"
-                        className="py-2.5 px-5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold uppercase tracking-wider text-xs cursor-pointer shadow-md transition-all"
-                      >
-                        Save Configuration
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={isTestingSupabase}
-                        onClick={handleTestSupabaseConnection}
-                        className="py-2.5 px-5 rounded-xl border border-cyan-500/60 bg-sky-950/80 hover:bg-sky-900 text-cyan-300 font-bold uppercase tracking-wider text-xs cursor-pointer transition-all flex items-center gap-2"
-                      >
-                        {isTestingSupabase ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Pinging Endpoint...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Server className="w-3.5 h-3.5" />
-                            <span>Test &amp; Ping Connection</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleTestFirebaseConnection}
+                      className="py-2.5 px-5 rounded-xl border border-cyan-500/60 bg-sky-950/80 hover:bg-sky-900 text-cyan-300 font-bold uppercase tracking-wider text-xs cursor-pointer transition-all flex items-center gap-2"
+                    >
+                      <Server className="w-3.5 h-3.5" />
+                      <span>Test &amp; Ping Firestore Endpoint</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -994,11 +904,11 @@ export const AdminPage: React.FC = () => {
                       <RefreshCw className="w-3.5 h-3.5" />
                       Live Data Sync Pipeline
                     </span>
-                    <span className="text-[10px] font-mono text-emerald-400">Ready</span>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">Online</span>
                   </div>
 
                   <p className="text-xs text-slate-400 font-mono">
-                    Synchronize cases, forensic exhibits, uploaded posters, and tournament leaderboard submissions directly into Supabase tables.
+                    Synchronize cases, forensic exhibits, uploaded posters, rules & regulations, and tournament submissions directly into Firestore collections.
                   </p>
 
                   {/* Sync Metrics */}
@@ -1019,152 +929,27 @@ export const AdminPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {supabaseConfig.lastSyncAt && (
-                    <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                      <span>Last Synchronized:</span>
-                      <span className="text-cyan-300 font-bold">
-                        {new Date(supabaseConfig.lastSyncAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-
                   <div className="pt-2">
                     <button
                       type="button"
-                      disabled={isSyncingSupabase}
-                      onClick={handleSyncToSupabase}
+                      disabled={isSyncingFirebase}
+                      onClick={handleSyncToFirebase}
                       className="w-full py-3 px-4 rounded-xl cyber-glow-btn text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg"
                     >
-                      {isSyncingSupabase ? (
+                      {isSyncingFirebase ? (
                         <>
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Pushing Records to Supabase...</span>
+                          <span>Pushing Records to Firebase...</span>
                         </>
                       ) : (
                         <>
                           <Database className="w-3.5 h-3.5" />
-                          <span>Push Bureau Data to Supabase</span>
+                          <span>Push Bureau Data to Firebase</span>
                         </>
                       )}
                     </button>
                   </div>
                 </div>
-
-                {/* Storage Bucket Info */}
-                <div className="border border-slate-800 bg-[#070e1c] p-4 rounded-xl space-y-2 text-xs font-mono">
-                  <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    <span>Evidence Poster Storage Bucket</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                    Posters uploaded in the Active Investigation view and Question editor are stored with base64 data URLs locally and mirrored to the <code className="text-cyan-300 bg-slate-900 px-1 py-0.5 rounded">{supabaseConfig.storageBucket}</code> bucket for public CDN delivery.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Supabase PostgreSQL DDL SQL Schema Generator */}
-          <div className="rounded-2xl border border-sky-900/60 bg-[#0c1322] p-6 space-y-4 shadow-xl font-mono text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
-                  <Database className="w-4 h-4 text-cyan-400" />
-                  <span>PostgreSQL Migration Schema (Supabase SQL Editor)</span>
-                </h3>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  Execute this SQL script in Supabase (SQL Editor &gt; New Query) to provision tables, relations, and security policies.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopySqlSchema}
-                  className="px-3.5 py-1.5 rounded-xl border border-cyan-500/70 bg-sky-950/80 hover:bg-sky-900 text-cyan-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all"
-                >
-                  {isSqlCopied ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Copied SQL!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy SQL Schema</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSqlSchema(!showSqlSchema)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 text-xs hover:text-white cursor-pointer"
-                >
-                  {showSqlSchema ? 'Hide Code' : 'View Code'}
-                </button>
-              </div>
-            </div>
-
-            {showSqlSchema && (
-              <div className="rounded-xl border border-slate-800 bg-[#050914] p-4 overflow-x-auto max-h-80 overflow-y-auto">
-                <pre className="text-[11px] font-mono text-cyan-300 leading-relaxed">
-                  {supabaseManager.generateSQLSchema()}
-                </pre>
-              </div>
-            )}
-          </div>
-
-          {/* Netlify Deployment Step-by-Step Guide */}
-          <div className="rounded-2xl border border-emerald-900/60 bg-gradient-to-r from-[#071318] via-[#091523] to-[#0a1020] p-6 space-y-4 shadow-xl font-mono text-xs">
-            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-2">
-                  <ExternalLink className="w-4 h-4 text-emerald-400" />
-                  <span>Netlify + Supabase Deployment Architecture Guide</span>
-                </h3>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  Complete walkthrough to connect your live Supabase database and host on Netlify with zero configuration errors.
-                </p>
-              </div>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                Production Ready
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-xl border border-slate-800 bg-[#050a14] space-y-2">
-                <div className="text-cyan-400 font-bold flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-cyan-950 border border-cyan-500 flex items-center justify-center text-[10px]">1</span>
-                  <span>Set Up Supabase DB</span>
-                </div>
-                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
-                  Go to <strong className="text-slate-200">supabase.com</strong>, create a project, then open <strong>SQL Editor</strong>. Copy and run the SQL migration schema above to create the tables (<code className="text-cyan-300">cases</code>, <code className="text-cyan-300">questions</code>, <code className="text-cyan-300">submissions</code>).
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-800 bg-[#050a14] space-y-2">
-                <div className="text-cyan-400 font-bold flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-cyan-950 border border-cyan-500 flex items-center justify-center text-[10px]">2</span>
-                  <span>Connect Keys in Netlify</span>
-                </div>
-                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
-                  In Netlify, open your site settings &rarr; <strong>Site configuration</strong> &rarr; <strong>Environment variables</strong>, and add:
-                </p>
-                <div className="p-2 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-slate-300 space-y-1">
-                  <div>VITE_SUPABASE_URL</div>
-                  <div>VITE_SUPABASE_ANON_KEY</div>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-800 bg-[#050a14] space-y-2">
-                <div className="text-cyan-400 font-bold flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-cyan-950 border border-cyan-500 flex items-center justify-center text-[10px]">3</span>
-                  <span>Deploy &amp; Sync</span>
-                </div>
-                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
-                  Build command is configured as <code className="text-cyan-300">npm run build</code> and publish dir is <code className="text-cyan-300">dist</code>. The preconfigured <code className="text-emerald-300">netlify.toml</code> and <code className="text-emerald-300">_redirects</code> handle all client routes seamlessly.
-                </p>
               </div>
             </div>
           </div>
@@ -1320,6 +1105,191 @@ export const AdminPage: React.FC = () => {
                 Reset to Factory Seed Data
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CASE CREATE / EDIT (RULES & REGULATIONS MANAGEMENT) */}
+      {isCaseModalOpen && editingCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl rounded-2xl border border-sky-800 bg-[#0c1322] text-slate-100 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCaseModalOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-md text-slate-400 hover:text-slate-200"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="border-b border-slate-800 pb-3 mb-4">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold">
+                CASE FILE CONFIGURATOR
+              </span>
+              <h3 className="text-base font-bold font-mono text-slate-100">
+                Edit Case Parameters & Rules and Regulations
+              </h3>
+            </div>
+
+            <form onSubmit={handleSaveCase} className="space-y-4 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Case Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCase.title}
+                    onChange={(e) => setEditingCase({ ...editingCase, title: e.target.value })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-100 font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Case Code (e.g. mk, BK7) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCase.caseCode}
+                    onChange={(e) => setEditingCase({ ...editingCase, caseCode: e.target.value })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Brief Case Summary</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={editingCase.summary}
+                  onChange={(e) => setEditingCase({ ...editingCase, summary: e.target.value })}
+                  className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-200 font-sans"
+                />
+              </div>
+
+              {/* Rules and Regulations Management Section */}
+              <div className="p-4 rounded-xl border border-sky-800/80 bg-[#070e1c] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold uppercase tracking-wider text-xs">
+                    <FileText className="w-4 h-4 text-cyan-400" />
+                    <span>Rules and Regulations Configuration</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 bg-sky-950 border border-sky-800 px-2 py-0.5 rounded font-bold">
+                    Official Bureau Protocols
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Rules & Protocol Read Timer (Seconds)</label>
+                    <input
+                      type="number"
+                      required
+                      min={10}
+                      max={600}
+                      value={editingCase.rulesTimerSeconds || 120}
+                      onChange={(e) => setEditingCase({ ...editingCase, rulesTimerSeconds: Number(e.target.value) })}
+                      className="w-full border border-slate-700 bg-slate-950 rounded-lg p-2 text-slate-100 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Briefing Review Timer (Seconds)</label>
+                    <input
+                      type="number"
+                      required
+                      min={10}
+                      max={600}
+                      value={editingCase.briefingTimerSeconds || 180}
+                      onChange={(e) => setEditingCase({ ...editingCase, briefingTimerSeconds: Number(e.target.value) })}
+                      className="w-full border border-slate-700 bg-slate-950 rounded-lg p-2 text-slate-100 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Incident Briefing & Rules Context</label>
+                  <textarea
+                    rows={2}
+                    value={editingCase.briefing || ''}
+                    onChange={(e) => setEditingCase({ ...editingCase, briefing: e.target.value })}
+                    placeholder="Specify case briefing guidelines and investigation directives..."
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-200 font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
+                    <span>Case Rules & Regulations (One rule per line)</span>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">RULES & REGULATIONS</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={(editingCase.rulesAndRegulations || []).join('\n')}
+                    onChange={(e) => {
+                      const lines = e.target.value.split('\n');
+                      setEditingCase({ ...editingCase, rulesAndRegulations: lines });
+                    }}
+                    placeholder="1. All investigators must register using official credentials.&#10;2. Time limits are strictly enforced (90s per level).&#10;3. Earn 2 stars on preceding levels to unlock higher clearance levels."
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-200 font-sans text-xs"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Enter each regulation on a separate line. These will be formatted dynamically in the Rules & Regulations protocol view.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Category</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCase.category}
+                    onChange={(e) => setEditingCase({ ...editingCase, category: e.target.value })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2 text-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Status</label>
+                  <select
+                    value={editingCase.status}
+                    onChange={(e) => setEditingCase({ ...editingCase, status: e.target.value as any })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2 text-slate-200 font-bold"
+                  >
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Time Limit (Seconds)</label>
+                  <input
+                    type="number"
+                    required
+                    value={editingCase.timeLimitSeconds}
+                    onChange={(e) => setEditingCase({ ...editingCase, timeLimitSeconds: Number(e.target.value) })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2 text-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCaseModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl cyber-glow-btn font-bold uppercase tracking-wider"
+                >
+                  Save Case Parameters
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

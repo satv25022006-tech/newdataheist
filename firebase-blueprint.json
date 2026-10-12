@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "Case": {
+      "title": "Case",
+      "description": "Forensic investigation case file and rules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "caseCode": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "incidentDescription": { "type": "string" },
+        "briefing": { "type": "string" },
+        "department": { "type": "string" },
+        "classification": { "type": "string" },
+        "status": { "type": "string" },
+        "category": { "type": "string" },
+        "rulesAndRegulations": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "caseCode", "title", "summary"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Forensic investigation question and exhibit notes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "caseId": { "type": "string" },
+        "level": { "type": "string" },
+        "prompt": { "type": "string" },
+        "explanation": { "type": "string" },
+        "forensicEvidenceNotes": { "type": "string" },
+        "posterUrl": { "type": "string" }
+      },
+      "required": ["id", "caseId", "level", "prompt"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Player investigation submission and leaderboard record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "submissionRef": { "type": "string" },
+        "caseId": { "type": "string" },
+        "caseCode": { "type": "string" },
+        "caseTitle": { "type": "string" },
+        "userId": { "type": "string" },
+        "playerName": { "type": "string" },
+        "badgeNumber": { "type": "string" },
+        "totalScoreEarned": { "type": "number" },
+        "totalStarsEarned": { "type": "number" },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["id", "submissionRef", "caseId", "playerName"]
+    }
+  },
+  "firestore": {
+    "/cases/{caseId}": {
+      "schema": "Case",
+      "description": "Forensic investigation cases and rules"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Case questions and forensic exhibits"
+    },
+    "/submissions/{submissionId}": {
+      "schema": "Submission",
+      "description": "Player final case submission records"
+    }
+  }
+}

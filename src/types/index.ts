@@ -90,6 +90,7 @@ export interface CaseItem {
   retriesAllowed: boolean;
   bannerGradient: string;
   bannerUrl?: string;
+  rulesAndRegulations?: string[];
   targets?: CaseTarget[];
   createdAt: string;
   updatedAt: string;

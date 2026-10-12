@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { bureauStore } from '../lib/store';
-import { supabaseManager } from '../lib/supabase';
+import { saveSubmissionToFirebase } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { StarRating } from '../components/common/StarRating';
 import { 
@@ -86,11 +86,11 @@ export const FinalSubmissionPage: React.FC = () => {
       }
     );
 
-    // Directly push to Supabase database (submissions table)
+    // Directly push to Firebase Firestore database
     try {
-      await supabaseManager.insertSubmission(submission);
+      await saveSubmissionToFirebase(submission);
     } catch (err) {
-      console.warn('Supabase sync skipped/offline:', err);
+      console.warn('Firebase Firestore sync notice:', err);
     }
 
     setTimeout(() => {
