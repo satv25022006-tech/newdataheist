@@ -947,7 +947,7 @@ export const AdminPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-3">
                     <button
                       type="button"
                       disabled={isSyncingFirebase}
@@ -965,6 +965,22 @@ export const AdminPage: React.FC = () => {
                           <span>Push Bureau Data to Firebase</span>
                         </>
                       )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm('Are you absolutely sure? This will permanently delete ALL cases, questions, and submissions from both local storage and Firestore.')) {
+                          bureauStore.clearAllSampleData();
+                          await firebaseManager.clearFirestoreCollections();
+                          alert('All data cleared.');
+                          window.location.reload();
+                        }
+                      }}
+                      className="w-full py-3 px-4 rounded-xl border border-rose-800 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear All Data</span>
                     </button>
                   </div>
                 </div>
