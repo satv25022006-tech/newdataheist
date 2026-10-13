@@ -15,7 +15,10 @@ import {
   saveSubmissionToFirebase, 
   saveCaseToFirebase, 
   saveQuestionToFirebase, 
-  saveBrandingToFirebase 
+  saveBrandingToFirebase,
+  deleteCaseFromFirebase,
+  deleteQuestionFromFirebase,
+  firebaseManager
 } from './firebase';
 
 const STORAGE_KEYS = {
@@ -27,6 +30,7 @@ const STORAGE_KEYS = {
   SUBMISSIONS: 'bureau_submissions_v1',
   CURRENT_USER: 'bureau_current_user_v1',
   BRANDING: 'bureau_branding_v1',
+  DELETED_QUESTIONS: 'bureau_deleted_questions_v1',
 };
 
 export interface BureauBranding {
@@ -102,6 +106,84 @@ export class BureauStore {
     this.submissions = loadFromStorage<FinalSubmission[]>(STORAGE_KEYS.SUBMISSIONS, []);
     this.currentUser = loadFromStorage<UserProfile>(STORAGE_KEYS.CURRENT_USER, DEFAULT_INVESTIGATOR);
     this.branding = loadFromStorage<BureauBranding>(STORAGE_KEYS.BRANDING, DEFAULT_BRANDING);
+
+    // Auto-fetch persistent cases, questions, and submissions from Cloud Firestore
+    this.loadFromFirebase().catch(err => {
+      console.warn('Firebase initial load notice:', err);
+    });
+  }
+
+  /**
+   * Fetches cases, questions, and submissions from Cloud Firestore.
+   * Merges remote & local data seamlessly so custom questions set in Admin are NEVER deleted!
+   */
+  public async loadFromFirebase(): Promise<boolean> {
+    try {
+      const [remoteCases, remoteQuestions, remoteSubmissions] = await Promise.all([
+        firebaseManager.fetchCases(),
+        firebaseManager.fetchQuestions(),
+        firebaseManager.fetchSubmissions(),
+      ]);
+
+      let updated = false;
+
+      // Cases Merging
+      if (remoteCases && remoteCases.length > 0) {
+        const caseMap = new Map<string, CaseItem>();
+        for (const c of this.cases) caseMap.set(c.id, c);
+        for (const c of remoteCases) caseMap.set(c.id, c);
+        this.cases = Array.from(caseMap.values());
+        saveToStorage(STORAGE_KEYS.CASES, this.cases);
+        updated = true;
+      }
+
+      // Questions Merging: Preserve all custom and default questions, respecting deleted list
+      const deletedQuestionIds = loadFromStorage<string[]>(STORAGE_KEYS.DELETED_QUESTIONS, []);
+      const questionMap = new Map<string, Question>();
+
+      // Populate local questions if not explicitly deleted
+      for (const q of this.questions) {
+        if (!deletedQuestionIds.includes(q.id)) {
+          questionMap.set(q.id, q);
+        }
+      }
+
+      // Merge remote questions from Firestore
+      if (remoteQuestions && remoteQuestions.length > 0) {
+        for (const q of remoteQuestions) {
+          if (!deletedQuestionIds.includes(q.id)) {
+            questionMap.set(q.id, q);
+          }
+        }
+      }
+
+      const mergedQuestions = Array.from(questionMap.values());
+      if (mergedQuestions.length > 0) {
+        this.questions = mergedQuestions;
+        saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
+        updated = true;
+
+        // Ensure missing questions are uploaded to Firestore for multi-client persistence
+        for (const q of mergedQuestions) {
+          saveQuestionToFirebase(q).catch(() => {});
+        }
+      }
+
+      if (remoteSubmissions && remoteSubmissions.length > 0) {
+        this.submissions = remoteSubmissions;
+        saveToStorage(STORAGE_KEYS.SUBMISSIONS, this.submissions);
+        updated = true;
+      }
+
+      if (updated && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('bureau-data-updated'));
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('bureauStore loadFromFirebase notice:', err);
+      return false;
+    }
   }
 
   // --- Branding & Logo ---
@@ -172,6 +254,9 @@ export class BureauStore {
     saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
     saveToStorage(STORAGE_KEYS.EVIDENCE, this.evidence);
     saveToStorage(STORAGE_KEYS.SUSPECTS, this.suspects);
+    deleteCaseFromFirebase(id).catch(err => {
+      console.warn('Firebase delete case notice:', err);
+    });
     return true;
   }
 
@@ -217,6 +302,13 @@ export class BureauStore {
   }
 
   saveQuestion(question: Question): Question {
+    // If question was previously in deleted list, remove it
+    const deletedQuestionIds = loadFromStorage<string[]>(STORAGE_KEYS.DELETED_QUESTIONS, []);
+    if (deletedQuestionIds.includes(question.id)) {
+      const updatedDeleted = deletedQuestionIds.filter(id => id !== question.id);
+      saveToStorage(STORAGE_KEYS.DELETED_QUESTIONS, updatedDeleted);
+    }
+
     const idx = this.questions.findIndex(q => q.id === question.id);
     if (idx >= 0) {
       this.questions[idx] = question;
@@ -236,14 +328,25 @@ export class BureauStore {
       q.posterUrl = posterUrl;
       if (posterTitle) q.posterTitle = posterTitle;
       saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
+      saveQuestionToFirebase(q).catch(err => {
+        console.warn('Firebase question poster notice:', err);
+      });
       return true;
     }
     return false;
   }
 
   deleteQuestion(id: string): boolean {
+    const deletedQuestionIds = loadFromStorage<string[]>(STORAGE_KEYS.DELETED_QUESTIONS, []);
+    if (!deletedQuestionIds.includes(id)) {
+      deletedQuestionIds.push(id);
+      saveToStorage(STORAGE_KEYS.DELETED_QUESTIONS, deletedQuestionIds);
+    }
     this.questions = this.questions.filter(q => q.id !== id);
     saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
+    deleteQuestionFromFirebase(id).catch(err => {
+      console.warn('Firebase delete question notice:', err);
+    });
     return true;
   }
 
@@ -347,7 +450,7 @@ export class BureauStore {
   submitLevelAnswers(
     caseId: string,
     level: DifficultyLevel,
-    playerAnswers: { questionId: string; selectedOptionLabel: 'A' | 'B' | 'C' | 'D' }[],
+    playerAnswers: { questionId: string; selectedOptionLabel: 'A' | 'B' | 'C' | 'D' | null }[],
     user: UserProfile
   ): {
     attempt: GameAttempt;
@@ -373,6 +476,7 @@ export class BureauStore {
     const questions = this.getAllQuestionsForCase(caseId).filter(q => q.level === level);
 
     let score = 0;
+    let maxPossibleScore = 0;
     const detailedAnswers: {
       questionId: string;
       isCorrect: boolean;
@@ -390,10 +494,13 @@ export class BureauStore {
     const answerRecords: any[] = [];
 
     questions.forEach((q, index) => {
+      const qPoints = q.points && q.points > 0 ? q.points : 1;
+      maxPossibleScore += qPoints;
+
       const answered = playerAnswers.find(pa => pa.questionId === q.id);
       const chosen = answered ? answered.selectedOptionLabel : null;
       const isCorrect = Boolean(chosen && chosen === q.correctOptionLabel);
-      if (isCorrect) score += 1;
+      if (isCorrect) score += qPoints;
 
       const correctOpt = q.options.find(o => o.optionLabel === q.correctOptionLabel);
       const chosenOpt = chosen ? q.options.find(o => o.optionLabel === chosen) : null;
@@ -423,7 +530,14 @@ export class BureauStore {
       }
     });
 
-    const stars = this.calculateStars(score, caseItem);
+    let stars = this.calculateStars(score, caseItem);
+    if (maxPossibleScore > 3) {
+      const ratio = score / maxPossibleScore;
+      if (ratio >= 0.85) stars = 3;
+      else if (ratio >= 0.5) stars = 2;
+      else if (ratio >= 0.25) stars = 1;
+      else stars = 0;
+    }
 
     // Update level progress while preserving best score & stars
     const currentProgress = attempt.levels[level];
@@ -434,6 +548,7 @@ export class BureauStore {
     const newBestStars = Math.max(prevBestStars, stars);
 
     currentProgress.score = score;
+    currentProgress.maxScore = maxPossibleScore;
     currentProgress.stars = stars;
     currentProgress.completed = true;
     currentProgress.attemptsCount += 1;
@@ -458,9 +573,9 @@ export class BureauStore {
       caseId,
       level,
       score,
-      maxScore: questions.length,
+      maxScore: maxPossibleScore,
       starsEarned: stars,
-      accuracy: Math.round((score / Math.max(1, questions.length)) * 100),
+      accuracy: Math.round((score / Math.max(1, maxPossibleScore)) * 100),
       timeElapsedSeconds: 26,
       timeSavedSeconds: 109,
       merits: score * 150,
@@ -665,6 +780,7 @@ export class BureauStore {
     this.suspects = INITIAL_SUSPECTS;
     this.attempts = {};
     this.submissions = this.generateSeedSubmissions();
+    saveToStorage(STORAGE_KEYS.DELETED_QUESTIONS, []);
     saveToStorage(STORAGE_KEYS.CASES, this.cases);
     saveToStorage(STORAGE_KEYS.QUESTIONS, this.questions);
     saveToStorage(STORAGE_KEYS.EVIDENCE, this.evidence);
@@ -681,6 +797,7 @@ export class BureauStore {
     this.suspects = [];
     this.attempts = {};
     this.submissions = [];
+    saveToStorage(STORAGE_KEYS.DELETED_QUESTIONS, []);
     saveToStorage(STORAGE_KEYS.CASES, []);
     saveToStorage(STORAGE_KEYS.QUESTIONS, []);
     saveToStorage(STORAGE_KEYS.EVIDENCE, []);

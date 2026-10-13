@@ -66,41 +66,6 @@ export const InvestigationPage: React.FC = () => {
     }
   }, [caseItem?.id, currentLevel]);
 
-  // Poster upload state for questions
-  const posterFileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
-
-  const handleUploadPoster = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      const targetQ = questions[currentIndex];
-      if (dataUrl && targetQ) {
-        bureauStore.updateQuestionPoster(
-          targetQ.id,
-          dataUrl,
-          `Uploaded Evidence Poster #${currentIndex + 1} (${file.name})`
-        );
-        setQuestions((prev) =>
-          prev.map((q) =>
-            q.id === targetQ.id
-              ? {
-                  ...q,
-                  posterUrl: dataUrl,
-                  posterTitle: `Uploaded Evidence: ${file.name}`,
-                }
-              : q
-          )
-        );
-        setUploadSuccessMsg(`Poster uploaded successfully for Exhibit #${currentIndex + 1}!`);
-        setTimeout(() => setUploadSuccessMsg(null), 3500);
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
   // Gameplay state
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -108,7 +73,7 @@ export const InvestigationPage: React.FC = () => {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [collectedAnswers, setCollectedAnswers] = useState<{
     questionId: string;
-    selectedOptionLabel: 'A' | 'B' | 'C' | 'D';
+    selectedOptionLabel: 'A' | 'B' | 'C' | 'D' | null;
   }[]>([]);
 
   // Time tracking
@@ -153,19 +118,50 @@ export const InvestigationPage: React.FC = () => {
       setTimeElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isAnswerSubmitted, isLevelFinished, timeLeft]);
+  }, [isAnswerSubmitted, isLevelFinished, timeLeft, currentIndex, questions, collectedAnswers, selectedOption, caseItem, currentLevel, user]);
 
   const handleAutoSubmitOnTimeout = () => {
-    if (!isAnswerSubmitted && questions.length > 0) {
-      const currentQ = questions[currentIndex];
-      const fallback = selectedOption || 'A';
-      setSelectedOption(fallback);
-      setIsAnswerSubmitted(true);
-      setCollectedAnswers((prev) => [
-        ...prev.filter(a => a.questionId !== currentQ.id),
-        { questionId: currentQ.id, selectedOptionLabel: fallback }
-      ]);
-    }
+    if (!caseItem || questions.length === 0 || isAnswerSubmitted) return;
+
+    const currentQ = questions[currentIndex];
+    // Do NOT auto-select correct answer or force any option! Preserve user's choice (or null if unselected)
+    const chosen = selectedOption;
+    
+    const updatedAnswers = [
+      ...collectedAnswers.filter(a => a.questionId !== currentQ.id),
+      { questionId: currentQ.id, selectedOptionLabel: chosen }
+    ];
+    setCollectedAnswers(updatedAnswers);
+
+    if (currentIndex + 1 < questions.length) {
+      // Automatically move to the next question on timeout
+      const nextQ = questions[currentIndex + 1];
+      setCurrentIndex((prev) => prev + 1);
+      setSelectedOption(null);
+      setIsAnswerSubmitted(false);
+      setTimeLeft(nextQ?.timeLimitSeconds || caseItem.timeLimitSeconds || 90);
+    } else {
+      // Last question in stage - finish stage automatically
+      const result = bureauStore.submitLevelAnswers(
+        caseItem.id,
+        currentLevel,
+        updatedAnswers,
+        user
+      );
+        setResultData(result);
+        setIsLevelFinished(true);
+        if (result.stars >= 2) {
+          try {
+            confetti({
+              particleCount: 60,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          } catch (e) {
+            // silent
+          }
+        }
+      }
   };
 
   if (!caseItem || questions.length === 0) {
@@ -192,10 +188,11 @@ export const InvestigationPage: React.FC = () => {
     if (!isAnswerSubmitted) return;
 
     if (currentIndex + 1 < questions.length) {
+      const nextQ = questions[currentIndex + 1];
       setCurrentIndex(prev => prev + 1);
       setSelectedOption(null);
       setIsAnswerSubmitted(false);
-      setTimeLeft(caseItem.timeLimitSeconds || 90);
+      setTimeLeft(nextQ?.timeLimitSeconds || caseItem.timeLimitSeconds || 90);
     } else {
       finishStage();
     }
@@ -204,7 +201,7 @@ export const InvestigationPage: React.FC = () => {
   const finishStage = () => {
     const finalAnswers = [
       ...collectedAnswers.filter(a => a.questionId !== currentQ.id),
-      { questionId: currentQ.id, selectedOptionLabel: selectedOption || 'A' }
+      { questionId: currentQ.id, selectedOptionLabel: selectedOption }
     ];
 
     const result = bureauStore.submitLevelAnswers(
@@ -301,8 +298,8 @@ export const InvestigationPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-amber-800/80 bg-amber-950/40 text-amber-300 font-bold">
-                <Trophy className="w-3.5 h-3.5" />
-                <span>18 pts</span>
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span>+{currentQ.points || 10} pts</span>
               </div>
             </div>
           </div>
@@ -317,24 +314,6 @@ export const InvestigationPage: React.FC = () => {
                   <span className="truncate max-w-[280px] sm:max-w-md">{currentQ.posterTitle || 'Forensic Evidence Poster'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Upload Poster Button for this question */}
-                  <button
-                    type="button"
-                    onClick={() => posterFileInputRef.current?.click()}
-                    className="text-slate-300 hover:text-cyan-300 bg-slate-900 hover:bg-sky-950 border border-slate-700 hover:border-cyan-500/70 px-2.5 py-1 rounded-lg flex items-center gap-1 text-[11px] transition-colors cursor-pointer"
-                    title="Upload custom poster or crime scene photo for this question"
-                  >
-                    <Upload className="w-3 h-3 text-cyan-400" />
-                    <span>Upload Poster</span>
-                  </button>
-                  <input
-                    ref={posterFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleUploadPoster}
-                  />
-
                   <button
                     type="button"
                     onClick={() => setIsPosterExpanded(!isPosterExpanded)}
@@ -345,14 +324,6 @@ export const InvestigationPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Upload Success Alert */}
-              {uploadSuccessMsg && (
-                <div className="p-2 rounded-lg bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 text-xs font-mono flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>{uploadSuccessMsg}</span>
-                </div>
-              )}
 
               {/* Render Poster Image */}
               <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center">
@@ -366,14 +337,8 @@ export const InvestigationPage: React.FC = () => {
                   />
                 ) : (
                   <div className="py-12 text-slate-500 text-xs font-mono flex flex-col items-center gap-2">
+                    <ImageIcon className="w-6 h-6 text-slate-600" />
                     <span>[Forensic Evidence Diagram #0{currentIndex + 1}]</span>
-                    <button
-                      type="button"
-                      onClick={() => posterFileInputRef.current?.click()}
-                      className="text-cyan-400 underline hover:text-cyan-300 text-[11px]"
-                    >
-                      Click to upload evidence poster
-                    </button>
                   </div>
                 )}
               </div>
@@ -408,10 +373,20 @@ export const InvestigationPage: React.FC = () => {
                     badgeStyle = 'border-cyan-400 bg-cyan-500 text-slate-950 font-black';
                   }
                 } else {
-                  // After deduction is confirmed: reveal RIGHT and WRONG clearly
+                  // After submission or timeout: reveal answer clearly without false selection
                   if (isCorrect) {
-                    cardStyle = 'border-emerald-500 bg-emerald-950/80 text-emerald-100 shadow-[0_0_25px_rgba(16,185,129,0.45)] ring-2 ring-emerald-500';
-                    badgeStyle = 'border-emerald-400 bg-emerald-500 text-slate-950 font-black';
+                    if (isSelected) {
+                      cardStyle = 'border-emerald-500 bg-emerald-950/80 text-emerald-100 shadow-[0_0_25px_rgba(16,185,129,0.45)] ring-2 ring-emerald-500';
+                      badgeStyle = 'border-emerald-400 bg-emerald-500 text-slate-950 font-black';
+                    } else if (!selectedOption) {
+                      // Timed out: show correct answer softly without marking it as user's selection
+                      cardStyle = 'border-emerald-600/60 bg-emerald-950/30 text-emerald-200 border-dashed';
+                      badgeStyle = 'border-emerald-500/80 bg-emerald-950 text-emerald-300 font-bold';
+                    } else {
+                      // User picked a wrong option: show correct option
+                      cardStyle = 'border-emerald-600/70 bg-emerald-950/40 text-emerald-200';
+                      badgeStyle = 'border-emerald-500/80 bg-emerald-900 text-emerald-200 font-bold';
+                    }
                   } else if (isPlayerChoiceWrong) {
                     cardStyle = 'border-rose-500 bg-rose-950/80 text-rose-100 shadow-[0_0_22px_rgba(244,63,94,0.45)] ring-2 ring-rose-500';
                     badgeStyle = 'border-rose-400 bg-rose-600 text-white font-black';
@@ -445,10 +420,16 @@ export const InvestigationPage: React.FC = () => {
                     {/* Post-deduction status badges on option card */}
                     {isAnswerSubmitted && (
                       <div className="shrink-0 flex items-center gap-1.5 font-mono text-[10px] font-bold">
-                        {isCorrect && (
+                        {isCorrect && isSelected && (
                           <span className="px-2 py-0.5 rounded bg-emerald-900/90 text-emerald-200 border border-emerald-500/80 flex items-center gap-1 shadow-sm">
                             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                             VERIFIED CORRECT
+                          </span>
+                        )}
+                        {isCorrect && !isSelected && (
+                          <span className="px-2 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-600/60 flex items-center gap-1 shadow-sm">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            CORRECT ANSWER
                           </span>
                         )}
                         {isPlayerChoiceWrong && (
@@ -464,12 +445,14 @@ export const InvestigationPage: React.FC = () => {
               })}
             </div>
 
-            {/* Instant RIGHT or WRONG Forensic Indication Banner */}
+            {/* Instant RIGHT, WRONG, or TIMEOUT Forensic Indication Banner */}
             {isAnswerSubmitted && (
               <div
                 className={`p-4 rounded-xl border-2 shadow-xl animate-in fade-in zoom-in-95 duration-200 space-y-2.5 ${
                   selectedOption === currentQ.correctOptionLabel
                     ? 'border-emerald-500/90 bg-emerald-950/40 text-emerald-100 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+                    : !selectedOption
+                    ? 'border-amber-500/90 bg-amber-950/40 text-amber-100 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
                     : 'border-rose-500/90 bg-rose-950/40 text-rose-100 shadow-[0_0_25px_rgba(244,63,94,0.25)]'
                 }`}
               >
@@ -481,6 +464,13 @@ export const InvestigationPage: React.FC = () => {
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
                         <span className="text-emerald-300">DEDUCTION VERIFIED — RIGHT!</span>
+                      </>
+                    ) : !selectedOption ? (
+                      <>
+                        <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                        <span className="text-amber-300">TIMER EXPIRED — NO ANSWER SELECTED!</span>
                       </>
                     ) : (
                       <>
@@ -496,11 +486,15 @@ export const InvestigationPage: React.FC = () => {
                     className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold border ${
                       selectedOption === currentQ.correctOptionLabel
                         ? 'bg-emerald-900/80 border-emerald-500 text-emerald-200'
+                        : !selectedOption
+                        ? 'bg-amber-900/80 border-amber-500 text-amber-200'
                         : 'bg-rose-900/80 border-rose-500 text-rose-200'
                     }`}
                   >
                     {selectedOption === currentQ.correctOptionLabel
                       ? '+100 BUREAU MERITS'
+                      : !selectedOption
+                      ? '0 BUREAU MERITS (TIMED OUT)'
                       : '0 BUREAU MERITS'}
                   </span>
                 </div>
@@ -508,8 +502,10 @@ export const InvestigationPage: React.FC = () => {
                 {/* Forensic finding rationale */}
                 <div className="text-xs space-y-1.5 pt-1 border-t border-slate-800">
                   {selectedOption !== currentQ.correctOptionLabel && (
-                    <div className="text-rose-200 font-medium">
-                      <span className="font-mono font-bold text-rose-400">CORRECT FORENSIC ANSWER: </span>
+                    <div className={!selectedOption ? 'text-amber-200 font-medium' : 'text-rose-200 font-medium'}>
+                      <span className={`font-mono font-bold ${!selectedOption ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {!selectedOption ? 'TIMED OUT — CORRECT FORENSIC ANSWER: ' : 'CORRECT FORENSIC ANSWER: '}
+                      </span>
                       Option {currentQ.correctOptionLabel} &mdash;{' '}
                       {currentQ.options.find((o) => o.optionLabel === currentQ.correctOptionLabel)?.optionText}
                     </div>

@@ -47,7 +47,8 @@ import {
   Copy,
   ExternalLink,
   CheckCircle2,
-  FileText
+  FileText,
+  Star
 } from 'lucide-react';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { 
@@ -609,6 +610,8 @@ export const AdminPage: React.FC = () => {
                   evidenceRef: `EXHIBIT #${currentCaseQuestions.length + 1}`,
                   posterTitle: `Forensic Evidence Poster: Exhibit #${currentCaseQuestions.length + 1}`,
                   posterUrl: '',
+                  timeLimitSeconds: 60,
+                  points: 10,
                   correctOptionLabel: 'A',
                   options: [
                     { id: `opt-${Date.now()}-a`, questionId: '', optionLabel: 'A', optionText: '' },
@@ -633,13 +636,21 @@ export const AdminPage: React.FC = () => {
               .map((q) => (
                 <div key={q.id} className="rounded-xl border border-sky-900/60 bg-[#0c1322] p-5 space-y-4">
                   {/* Top Bar */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <div className="flex items-center gap-2 font-mono text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2 font-mono text-xs flex-wrap">
                       <span className="font-bold text-cyan-400 bg-sky-950 border border-sky-800 px-2 py-0.5 rounded">
                         Q{q.orderNumber}
                       </span>
                       <span className="text-slate-400">{q.evidenceRef}</span>
                       <span className="text-slate-500 font-sans text-xs">· {q.posterTitle}</span>
+
+                      {/* Question Timer and Points Badges */}
+                      <span className="text-cyan-300 font-bold bg-sky-950/80 border border-sky-700 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-cyan-400" /> {q.timeLimitSeconds || 60}s
+                      </span>
+                      <span className="text-amber-300 font-bold bg-amber-950/80 border border-amber-700 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                        ★ {q.points || 10} Pts
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-2 font-mono text-xs">
@@ -1235,7 +1246,7 @@ export const AdminPage: React.FC = () => {
                     <span className="text-[10px] text-cyan-400 font-mono font-bold">RULES & REGULATIONS</span>
                   </label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={(editingCase.rulesAndRegulations || []).join('\n')}
                     onChange={(e) => {
                       const lines = e.target.value.split('\n');
@@ -1245,8 +1256,58 @@ export const AdminPage: React.FC = () => {
                     className="w-full border border-slate-700 bg-slate-950 rounded-xl p-2.5 text-slate-200 font-sans text-xs"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Enter each regulation on a separate line. These will be formatted dynamically in the Rules & Regulations protocol view.
+                    Enter each regulation on a separate line.
                   </p>
+                </div>
+
+                {/* Target Stages Configuration Section */}
+                <div className="pt-2 space-y-2 border-t border-slate-800/80">
+                  <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                    BRIEFING TARGET STAGES (TARGET 1, TARGET 2, TARGET 3)
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {([0, 1, 2]).map((idx) => {
+                      const currentTargets = editingCase.targets && editingCase.targets.length === 3 ? editingCase.targets : [
+                        { id: 'target-1', label: 'TARGET 1: EVIDENCE', description: 'Inspect forensic posters, network topologies, and evidence frames.' },
+                        { id: 'target-2', label: 'TARGET 2: DECRYPTION', description: 'Detect cloned RFID badges, spectral toxins, and rogue payloads.' },
+                        { id: 'target-3', label: 'TARGET 3: NEUTRALIZE', description: 'Disarm laser arrays and intercept the getaway craft before extraction.' },
+                      ];
+                      const tgt = currentTargets[idx];
+
+                      return (
+                        <div key={idx} className="p-2.5 rounded-lg border border-slate-800 bg-slate-950 space-y-1.5">
+                          <span className="text-[10px] text-amber-400 font-bold uppercase">Target #{idx + 1}</span>
+                          <div>
+                            <label className="block text-slate-400 text-[10px]">Label</label>
+                            <input
+                              type="text"
+                              value={tgt.label}
+                              onChange={(e) => {
+                                const next = [...currentTargets];
+                                next[idx] = { ...next[idx], label: e.target.value };
+                                setEditingCase({ ...editingCase, targets: next });
+                              }}
+                              className="w-full border border-slate-700 bg-slate-900 rounded p-1.5 text-cyan-300 font-bold text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 text-[10px]">Description</label>
+                            <textarea
+                              rows={2}
+                              value={tgt.description}
+                              onChange={(e) => {
+                                const next = [...currentTargets];
+                                next[idx] = { ...next[idx], description: e.target.value };
+                                setEditingCase({ ...editingCase, targets: next });
+                              }}
+                              className="w-full border border-slate-700 bg-slate-900 rounded p-1.5 text-slate-300 font-sans text-xs"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -1431,6 +1492,43 @@ export const AdminPage: React.FC = () => {
                     />
                   </div>
                 ))}
+              </div>
+
+              {/* Question Time Limit & Point Value Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border border-sky-800/80 bg-[#070e1c]">
+                <div>
+                  <label className="block text-cyan-400 mb-1 font-bold flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Question Timer (Seconds)</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={5}
+                    max={600}
+                    value={editingQuestion.timeLimitSeconds || 60}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, timeLimitSeconds: Number(e.target.value) })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-lg p-2 text-slate-100 font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Timer duration for this question.</p>
+                </div>
+
+                <div>
+                  <label className="block text-amber-400 mb-1 font-bold flex items-center gap-1">
+                    <Star className="w-3.5 h-3.5" />
+                    <span>Question Points / Merit Value</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={1000}
+                    value={editingQuestion.points || 10}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, points: Number(e.target.value) })}
+                    className="w-full border border-slate-700 bg-slate-950 rounded-lg p-2 text-amber-300 font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Points awarded for correct answer.</p>
+                </div>
               </div>
 
               <div>

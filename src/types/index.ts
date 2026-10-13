@@ -53,6 +53,8 @@ export interface Question {
   posterUrl?: string; // Poster image URL or base64 uploaded image
   posterTitle?: string; // e.g. "Forensic Evidence Poster"
   forensicEvidenceNotes?: string; // Forensic evidence notes & lab logs
+  timeLimitSeconds?: number; // Per-question countdown timer (e.g. 30s, 45s, 60s, 90s)
+  points?: number; // Merit points awarded for correct answer (e.g. 10, 25, 50, 100 pts)
   options: QuestionOption[];
   correctOptionLabel?: 'A' | 'B' | 'C' | 'D'; // Kept private on server/admin
 }

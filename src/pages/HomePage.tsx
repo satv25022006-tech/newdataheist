@@ -16,7 +16,16 @@ import {
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [cases] = useState(bureauStore.getCases());
+  const [cases, setCases] = useState(bureauStore.getCases());
+
+  React.useEffect(() => {
+    const handleDataUpdate = () => {
+      setCases(bureauStore.getCases());
+    };
+    window.addEventListener('bureau-data-updated', handleDataUpdate);
+    bureauStore.loadFromFirebase().then(() => setCases(bureauStore.getCases()));
+    return () => window.removeEventListener('bureau-data-updated', handleDataUpdate);
+  }, []);
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto py-2">

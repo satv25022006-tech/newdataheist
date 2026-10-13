@@ -186,6 +186,24 @@ class FirebaseManager {
   }
 
   /**
+   * Fetches all questions from Firestore
+   */
+  public async fetchQuestions(): Promise<Question[]> {
+    const path = 'questions';
+    try {
+      const querySnapshot = await getDocs(collection(db, 'questions'));
+      const list: Question[] = [];
+      querySnapshot.forEach((d) => {
+        list.push(d.data() as Question);
+      });
+      return list;
+    } catch (err) {
+      console.warn('Error fetching questions from Firestore:', err);
+      return [];
+    }
+  }
+
+  /**
    * Clears all cases, questions, and submissions from Firestore
    */
   public async clearFirestoreCollections(): Promise<{ success: boolean; message: string }> {
@@ -237,6 +255,16 @@ export async function saveQuestionToFirebase(question: Question) {
     return { success: true };
   } catch (err) {
     console.warn('Error saving question to Firebase:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+export async function deleteQuestionFromFirebase(questionId: string) {
+  try {
+    await deleteDoc(doc(db, 'questions', questionId));
+    return { success: true };
+  } catch (err) {
+    console.warn('Error deleting question from Firebase:', err);
     return { success: false, error: String(err) };
   }
 }
